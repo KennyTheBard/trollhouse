@@ -125,7 +125,7 @@ func main() {
 	// }
 
 	jumpAnimation := LoadAnimation("./resources/animations/jump.saf")
-	bounceAnimation := LoadAnimation("./resources/animations/bounce.saf")
+	// bounceAnimation := LoadAnimation("./resources/animations/bounce.saf")
 
 	animationUniform := gl.GetUniformLocation(program, gl.Str("anim\x00"))
 
@@ -137,25 +137,26 @@ func main() {
 	// angle := 0.0
 	previousTime := glfw.GetTime()
 
+	jumpAnimation.begin(previousTime)
 	for !window.ShouldClose() {
 		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
 		// Update
 		time := glfw.GetTime()
-		elapsed := time - previousTime
+		// elapsed := time - previousTime
 		previousTime = time
 
 		// angle += elapsed
 		// model = mgl32.HomogRotate3D(float32(angle), mgl32.Vec3{0, 1, 0})
 
-		node.translate([3]float32{0.0, 0.25 * float32(elapsed), 0.0})
+		// node.addTranslation([3]float32{0.0, 0.25 * float32(elapsed), 0.0})
 
 		// gl.PolygonMode(GL_FRONT_AND_BACK, GL_LINE)
 
 		// Render
 		gl.UseProgram(program)
 		gl.UniformMatrix4fv(modelUniform, 1, false, &model[0])
-		gl.Uniform3fv(animationUniform, 2, &(tree.getAnimation()[0]))
+		gl.Uniform3fv(animationUniform, 2, &(jumpAnimation.animate(tree, time)[0]))
 
 		gl.BindVertexArray(vao)
 
@@ -355,20 +356,20 @@ func (p *AnimationNode) addChild(pos [3]float32) {
 	(*p).Children = append((*p).Children, &n)
 }
 
-func (p *AnimationNode) addTranslation(pos [3]float32) {
+func (p *AnimationNode) translate(pos [3]float32) {
 	(*p).Translation[0] += pos[0]
 	(*p).Translation[1] += pos[1]
 	(*p).Translation[2] += pos[2]
 
 	for _, child := range (*p).Children {
-		child.addTranslation(pos)
+		child.translate(pos)
 	}
 }
 
-func (p *AnimationNode) setTranslation(pos [3]float32) {
-	(*p).Translation = pos
+func (p *AnimationNode) resetTranslation() {
+	(*p).Translation = [3]float32{0.0, 0.0, 0.0}
 	for _, child := range (*p).Children {
-		child.addTranslation(pos)
+		child.resetTranslation()
 	}
 }
 
@@ -410,6 +411,7 @@ type AnimationTimeStamp struct {
 }
 
 type Animation struct {
+	StartTime         float64
 	TimeStampDuration float32
 	TimeStamps        []AnimationTimeStamp
 }
@@ -423,6 +425,7 @@ func LoadAnimation(filename string) Animation {
 
 	scanner := bufio.NewScanner(file)
 	var anim Animation
+	anim.StartTime = 0.0
 	anim.TimeStampDuration = 1.0
 	anim.TimeStamps = make([]AnimationTimeStamp, 0)
 	var timestamp AnimationTimeStamp
@@ -467,25 +470,58 @@ func LoadAnimation(filename string) Animation {
 	return anim
 }
 
-// func (a Animation) animate(t AnimationTree, time float32) []float32 {
-// 	// reset values
-// 	for _, n := range t.Nodes {
-// 		n.setTranslation([3]float32{0.0, 0.0, 0.0})
-// 	}
+func (a *Animation) begin(startTime float64) {
+	(*a).StartTime = startTime
+}
 
-// 	for i, ts := range a.TimeStamps {
-// 		if float32(ts.TimePoint)*a.TimeStampDuration > time {
-// 			break;
-// 		}
+func (a Animation) animate(t AnimationTree, currTime float64) []float32 {
+	// reset values
+	for _, n := range t.Nodes {
+		n.resetTranslation()
+	}
 
-// 		ts.Translations
-// 		return a.animate(t, time)
-// 	}
+	// get current run context
+	time := currTime - a.StartTime
 
-// 	return t.getAnimation()
-// }
+	var pos int
+	for i, ts := range a.TimeStamps {
+		if float32(ts.TimePoint)*a.TimeStampDuration > float32(time) {
+			break
+		}
+
+		pos = i
+	}
+
+	ts := a.TimeStamps[pos]
+
+	var prevTimePoint float32
+	if pos > 0 {
+		prevTimePoint = float32(a.TimeStamps[pos-1].TimePoint) * a.TimeStampDuration
+	}
+
+	factor := (float32(ts.TimePoint)*a.TimeStampDuration - prevTimePoint) / (float32(time) - prevTimePoint)
+
+	for i, trans := range ts.Translations {
+		currTrans := [3]float32{0.0, 0.0, 0.0}
+		if pos > 0 {
+			currTrans = vec3Lerp(a.TimeStamps[pos-1].Translations[i].Translation, trans.Translation, factor)
+		} else {
+			currTrans = vec3Lerp(currTrans, trans.Translation, factor)
+		}
+
+		t.Nodes[trans.NodeIdx].translate(trans.Translation)
+	}
+
+	return t.getAnimation()
+}
 
 // factor should be between 0 and 1
 func lerp(a, b, factor float32) float32 {
 	return a*factor + b*(1-factor)
+}
+
+func vec3Lerp(a, b [3]float32, factor float32) [3]float32 {
+	return [3]float32{lerp(a[0], b[0], factor),
+		lerp(a[1], b[1], factor),
+		lerp(a[2], b[2], factor)}
 }
