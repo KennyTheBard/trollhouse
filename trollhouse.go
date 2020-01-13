@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"image"
 	"image/draw"
@@ -9,6 +10,7 @@ import (
 	"log"
 	"os"
 	"runtime"
+	"strconv"
 	"strings"
 
 	"github.com/go-gl/gl/v4.1-core/gl"
@@ -122,21 +124,17 @@ func main() {
 	// 	tree.Skin = append(tree.Skin, sv)
 	// }
 
-	node.translate([3]float32{0.0, 1, 0.0})
-	node.Children[0].translate([3]float32{0.0, 1, 0.0})
+	jumpAnimation := LoadAnimation("./resources/animations/jump.saf")
+	bounceAnimation := LoadAnimation("./resources/animations/bounce.saf")
 
 	animationUniform := gl.GetUniformLocation(program, gl.Str("anim\x00"))
-
-	fmt.Println(len(tree.Nodes))
-	gl.Uniform3fv(animationUniform, 2, &(tree.getAnimation()[0]))
-	fmt.Println(tree.getAnimation())
 
 	// Configure global settings
 	gl.Enable(gl.DEPTH_TEST)
 	gl.DepthFunc(gl.LESS)
 	gl.ClearColor(0.1, 0.1, 0.1, 1.0)
 
-	angle := 0.0
+	// angle := 0.0
 	previousTime := glfw.GetTime()
 
 	for !window.ShouldClose() {
@@ -147,14 +145,17 @@ func main() {
 		elapsed := time - previousTime
 		previousTime = time
 
-		angle += elapsed
-		model = mgl32.HomogRotate3D(float32(angle), mgl32.Vec3{0, 1, 0})
+		// angle += elapsed
+		// model = mgl32.HomogRotate3D(float32(angle), mgl32.Vec3{0, 1, 0})
+
+		node.translate([3]float32{0.0, 0.25 * float32(elapsed), 0.0})
 
 		// gl.PolygonMode(GL_FRONT_AND_BACK, GL_LINE)
 
 		// Render
 		gl.UseProgram(program)
 		gl.UniformMatrix4fv(modelUniform, 1, false, &model[0])
+		gl.Uniform3fv(animationUniform, 2, &(tree.getAnimation()[0]))
 
 		gl.BindVertexArray(vao)
 
@@ -303,37 +304,37 @@ var cubeVertices = []float32{
 	-1.0, 1.0, 1.0, 0.0, 1.0, 1.0,
 	1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
 
-	// Front
-	-1.0, -1.0, 1.0, 1.0, 0.0, -1.0,
-	1.0, -1.0, 1.0, 0.0, 0.0, -1.0,
-	-1.0, 1.0, 1.0, 1.0, 1.0, -1.0,
-	1.0, -1.0, 1.0, 0.0, 0.0, -1.0,
-	1.0, 1.0, 1.0, 0.0, 1.0, -1.0,
-	-1.0, 1.0, 1.0, 1.0, 1.0, -1.0,
+	// // Front
+	// -1.0, -1.0, 1.0, 1.0, 0.0, -1.0,
+	// 1.0, -1.0, 1.0, 0.0, 0.0, -1.0,
+	// -1.0, 1.0, 1.0, 1.0, 1.0, -1.0,
+	// 1.0, -1.0, 1.0, 0.0, 0.0, -1.0,
+	// 1.0, 1.0, 1.0, 0.0, 1.0, -1.0,
+	// -1.0, 1.0, 1.0, 1.0, 1.0, -1.0,
 
-	// Back
-	-1.0, -1.0, -1.0, 0.0, 0.0, -1.0,
-	-1.0, 1.0, -1.0, 0.0, 1.0, -1.0,
-	1.0, -1.0, -1.0, 1.0, 0.0, -1.0,
-	1.0, -1.0, -1.0, 1.0, 0.0, -1.0,
-	-1.0, 1.0, -1.0, 0.0, 1.0, -1.0,
-	1.0, 1.0, -1.0, 1.0, 1.0, -1.0,
+	// // Back
+	// -1.0, -1.0, -1.0, 0.0, 0.0, -1.0,
+	// -1.0, 1.0, -1.0, 0.0, 1.0, -1.0,
+	// 1.0, -1.0, -1.0, 1.0, 0.0, -1.0,
+	// 1.0, -1.0, -1.0, 1.0, 0.0, -1.0,
+	// -1.0, 1.0, -1.0, 0.0, 1.0, -1.0,
+	// 1.0, 1.0, -1.0, 1.0, 1.0, -1.0,
 
-	// Left
-	-1.0, -1.0, 1.0, 0.0, 1.0, -1.0,
-	-1.0, 1.0, -1.0, 1.0, 0.0, -1.0,
-	-1.0, -1.0, -1.0, 0.0, 0.0, -1.0,
-	-1.0, -1.0, 1.0, 0.0, 1.0, -1.0,
-	-1.0, 1.0, 1.0, 1.0, 1.0, -1.0,
-	-1.0, 1.0, -1.0, 1.0, 0.0, -1.0,
+	// // Left
+	// -1.0, -1.0, 1.0, 0.0, 1.0, -1.0,
+	// -1.0, 1.0, -1.0, 1.0, 0.0, -1.0,
+	// -1.0, -1.0, -1.0, 0.0, 0.0, -1.0,
+	// -1.0, -1.0, 1.0, 0.0, 1.0, -1.0,
+	// -1.0, 1.0, 1.0, 1.0, 1.0, -1.0,
+	// -1.0, 1.0, -1.0, 1.0, 0.0, -1.0,
 
-	// Right
-	1.0, -1.0, 1.0, 1.0, 1.0, -1.0,
-	1.0, -1.0, -1.0, 1.0, 0.0, -1.0,
-	1.0, 1.0, -1.0, 0.0, 0.0, -1.0,
-	1.0, -1.0, 1.0, 1.0, 1.0, -1.0,
-	1.0, 1.0, -1.0, 0.0, 0.0, -1.0,
-	1.0, 1.0, 1.0, 0.0, 1.0, -1.0,
+	// // Right
+	// 1.0, -1.0, 1.0, 1.0, 1.0, -1.0,
+	// 1.0, -1.0, -1.0, 1.0, 0.0, -1.0,
+	// 1.0, 1.0, -1.0, 0.0, 0.0, -1.0,
+	// 1.0, -1.0, 1.0, 1.0, 1.0, -1.0,
+	// 1.0, 1.0, -1.0, 0.0, 0.0, -1.0,
+	// 1.0, 1.0, 1.0, 0.0, 1.0, -1.0,
 }
 
 type AnimationNode struct {
@@ -354,8 +355,21 @@ func (p *AnimationNode) addChild(pos [3]float32) {
 	(*p).Children = append((*p).Children, &n)
 }
 
-func (p *AnimationNode) translate(pos [3]float32) {
+func (p *AnimationNode) addTranslation(pos [3]float32) {
+	(*p).Translation[0] += pos[0]
+	(*p).Translation[1] += pos[1]
+	(*p).Translation[2] += pos[2]
+
+	for _, child := range (*p).Children {
+		child.addTranslation(pos)
+	}
+}
+
+func (p *AnimationNode) setTranslation(pos [3]float32) {
 	(*p).Translation = pos
+	for _, child := range (*p).Children {
+		child.addTranslation(pos)
+	}
 }
 
 type SkinVertex struct {
@@ -383,4 +397,95 @@ func (t AnimationTree) getAnimation() []float32 {
 		ret[i*3+2] = node.Translation[2]
 	}
 	return ret
+}
+
+type NodeAnimationTranslation struct {
+	NodeIdx     int
+	Translation [3]float32
+}
+
+type AnimationTimeStamp struct {
+	TimePoint    int
+	Translations []NodeAnimationTranslation
+}
+
+type Animation struct {
+	TimeStampDuration float32
+	TimeStamps        []AnimationTimeStamp
+}
+
+func LoadAnimation(filename string) Animation {
+	file, err := os.Open(filename)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	var anim Animation
+	anim.TimeStampDuration = 1.0
+	anim.TimeStamps = make([]AnimationTimeStamp, 0)
+	var timestamp AnimationTimeStamp
+	first := true
+	for scanner.Scan() {
+		words := strings.Split(scanner.Text(), " ")
+		if words[0] == "ts" {
+			if first {
+				first = false
+			} else {
+				anim.TimeStamps = append(anim.TimeStamps, timestamp)
+			}
+			timestamp = AnimationTimeStamp{}
+
+			ts, _ := strconv.Atoi(words[1])
+			timestamp.TimePoint = ts
+			timestamp.Translations = make([]NodeAnimationTranslation, 0)
+		} else {
+			var translation NodeAnimationTranslation
+			translation.NodeIdx, _ = strconv.Atoi(words[0])
+
+			var aux float64
+
+			aux, _ = strconv.ParseFloat(words[1], 32)
+			translation.Translation[0] = float32(aux)
+
+			aux, _ = strconv.ParseFloat(words[2], 32)
+			translation.Translation[1] = float32(aux)
+
+			aux, _ = strconv.ParseFloat(words[3], 32)
+			translation.Translation[2] = float32(aux)
+
+			timestamp.Translations = append(timestamp.Translations, translation)
+		}
+	}
+	anim.TimeStamps = append(anim.TimeStamps, timestamp)
+
+	if err := scanner.Err(); err != nil {
+		log.Fatal(err)
+	}
+
+	return anim
+}
+
+// func (a Animation) animate(t AnimationTree, time float32) []float32 {
+// 	// reset values
+// 	for _, n := range t.Nodes {
+// 		n.setTranslation([3]float32{0.0, 0.0, 0.0})
+// 	}
+
+// 	for i, ts := range a.TimeStamps {
+// 		if float32(ts.TimePoint)*a.TimeStampDuration > time {
+// 			break;
+// 		}
+
+// 		ts.Translations
+// 		return a.animate(t, time)
+// 	}
+
+// 	return t.getAnimation()
+// }
+
+// factor should be between 0 and 1
+func lerp(a, b, factor float32) float32 {
+	return a*factor + b*(1-factor)
 }
