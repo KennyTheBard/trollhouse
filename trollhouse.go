@@ -124,8 +124,8 @@ func main() {
 	// 	tree.Skin = append(tree.Skin, sv)
 	// }
 
-	jumpAnimation := LoadAnimation("./resources/animations/jump.saf")
-	bounceAnimation := LoadAnimation("./resources/animations/bounce.saf")
+	anim1 := LoadAnimation("./resources/animations/twist.saf")
+	anim2 := LoadAnimation("./resources/animations/bounce.saf")
 
 	animationUniform := gl.GetUniformLocation(program, gl.Str("anim\x00"))
 
@@ -137,8 +137,8 @@ func main() {
 	// angle := 0.0
 	previousTime := glfw.GetTime()
 
-	jumpAnimation.begin(previousTime)
-	bounceAnimation.begin(previousTime)
+	anim1.begin(previousTime)
+	anim2.begin(previousTime)
 	for !window.ShouldClose() {
 		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
@@ -159,9 +159,11 @@ func main() {
 		gl.UniformMatrix4fv(modelUniform, 1, false, &model[0])
 
 		tree.resetTree()
-		gl.Uniform3fv(animationUniform,
+		tAnim := anim2.animate(anim1.animate(tree, time), time).getAnimation()
+		fmt.Println(tAnim)
+		gl.Uniform4fv(animationUniform,
 			2,
-			&(bounceAnimation.animate(jumpAnimation.animate(tree, time), time).getAnimation()[0]))
+			&(tAnim[0]))
 
 		gl.BindVertexArray(vao)
 
@@ -378,6 +380,7 @@ var cubeVertices = []float32{
 type AnimationNode struct {
 	Pos         [3]float32
 	Translation [3]float32
+	RotationY   float32
 	Children    []*AnimationNode
 }
 
@@ -385,6 +388,7 @@ func NewAnimationNode(pos [3]float32) AnimationNode {
 	return AnimationNode{
 		pos,
 		[3]float32{0.0, 0.0, 0.0},
+		0.0,
 		make([]*AnimationNode, 0)}
 }
 
@@ -410,6 +414,20 @@ func (p *AnimationNode) resetTranslation() {
 	}
 }
 
+func (p *AnimationNode) rotateY(rot float32) {
+	(*p).RotationY += rot
+	for _, child := range (*p).Children {
+		child.rotateY(rot)
+	}
+}
+
+func (p *AnimationNode) resetRotationY() {
+	(*p).RotationY = 0.0
+	for _, child := range (*p).Children {
+		child.resetRotationY()
+	}
+}
+
 type SkinVertex struct {
 	VertexIdx int
 	Weights   map[int]float32
@@ -428,11 +446,12 @@ func (t *AnimationTree) addNodes(node *AnimationNode) {
 }
 
 func (t AnimationTree) getAnimation() []float32 {
-	ret := make([]float32, len(t.Nodes)*3)
+	ret := make([]float32, len(t.Nodes)*4)
 	for i, node := range t.Nodes {
-		ret[i*3] = node.Translation[0]
-		ret[i*3+1] = node.Translation[1]
-		ret[i*3+2] = node.Translation[2]
+		ret[i*4] = node.Translation[0]
+		ret[i*4+1] = node.Translation[1]
+		ret[i*4+2] = node.Translation[2]
+		ret[i*4+3] = node.RotationY
 	}
 	return ret
 }
@@ -440,12 +459,14 @@ func (t AnimationTree) getAnimation() []float32 {
 func (t *AnimationTree) resetTree() {
 	for _, n := range (*t).Nodes {
 		n.resetTranslation()
+		n.resetRotationY()
 	}
 }
 
 type NodeAnimationTranslation struct {
 	NodeIdx     int
 	Translation [3]float32
+	RotationY   float32
 }
 
 type AnimationTimeStamp struct {
@@ -501,6 +522,9 @@ func LoadAnimation(filename string) Animation {
 			aux, _ = strconv.ParseFloat(words[3], 32)
 			translation.Translation[2] = float32(aux)
 
+			aux, _ = strconv.ParseFloat(words[4], 32)
+			translation.RotationY = float32(aux)
+
 			timestamp.Translations = append(timestamp.Translations, translation)
 		}
 	}
@@ -541,17 +565,21 @@ func (a Animation) animate(t AnimationTree, currTime float64) AnimationTree {
 	}
 
 	factor := (time - prevTimePoint) / (float32(ts.TimePoint)*a.TimeStampDuration - prevTimePoint)
-	fmt.Printf("currTimePoint = %f, prevTimePoint = %f, time = %f, factor = %f\n", float32(ts.TimePoint)*a.TimeStampDuration, prevTimePoint, time, factor)
+	// fmt.Printf("currTimePoint = %f, prevTimePoint = %f, time = %f, factor = %f\n", float32(ts.TimePoint)*a.TimeStampDuration, prevTimePoint, time, factor)
 
 	for i, trans := range ts.Translations {
 		currTrans := [3]float32{0.0, 0.0, 0.0}
+		var currRotationY float32
 		if pos > 0 {
 			currTrans = vec3Lerp(a.TimeStamps[pos-1].Translations[i].Translation, trans.Translation, factor)
+			currRotationY = lerp(a.TimeStamps[pos-1].Translations[i].RotationY, trans.RotationY, factor)
 		} else {
 			currTrans = vec3Lerp(currTrans, trans.Translation, factor)
+			currRotationY = lerp(currRotationY, trans.RotationY, factor)
 		}
 
 		t.Nodes[trans.NodeIdx].translate(currTrans)
+		t.Nodes[trans.NodeIdx].rotateY(currRotationY)
 	}
 
 	return t
