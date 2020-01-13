@@ -125,7 +125,7 @@ func main() {
 	// }
 
 	jumpAnimation := LoadAnimation("./resources/animations/jump.saf")
-	// bounceAnimation := LoadAnimation("./resources/animations/bounce.saf")
+	bounceAnimation := LoadAnimation("./resources/animations/bounce.saf")
 
 	animationUniform := gl.GetUniformLocation(program, gl.Str("anim\x00"))
 
@@ -138,6 +138,7 @@ func main() {
 	previousTime := glfw.GetTime()
 
 	jumpAnimation.begin(previousTime)
+	bounceAnimation.begin(previousTime)
 	for !window.ShouldClose() {
 		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
@@ -156,7 +157,11 @@ func main() {
 		// Render
 		gl.UseProgram(program)
 		gl.UniformMatrix4fv(modelUniform, 1, false, &model[0])
-		gl.Uniform3fv(animationUniform, 2, &(jumpAnimation.animate(tree, time)[0]))
+
+		tree.resetTree()
+		gl.Uniform3fv(animationUniform,
+			2,
+			&(bounceAnimation.animate(jumpAnimation.animate(tree, time), time).getAnimation()[0]))
 
 		gl.BindVertexArray(vao)
 
@@ -400,6 +405,12 @@ func (t AnimationTree) getAnimation() []float32 {
 	return ret
 }
 
+func (t *AnimationTree) resetTree() {
+	for _, n := range (*t).Nodes {
+		n.resetTranslation()
+	}
+}
+
 type NodeAnimationTranslation struct {
 	NodeIdx     int
 	Translation [3]float32
@@ -474,12 +485,7 @@ func (a *Animation) begin(startTime float64) {
 	(*a).StartTime = startTime
 }
 
-func (a Animation) animate(t AnimationTree, currTime float64) []float32 {
-	// reset values
-	for _, n := range t.Nodes {
-		n.resetTranslation()
-	}
-
+func (a Animation) animate(t AnimationTree, currTime float64) AnimationTree {
 	// bound animation time
 	time := float32(currTime - a.StartTime)
 	for finalTimePoint := float32(a.TimeStamps[len(a.TimeStamps)-1].TimePoint) * a.TimeStampDuration; time > finalTimePoint; {
@@ -516,12 +522,12 @@ func (a Animation) animate(t AnimationTree, currTime float64) []float32 {
 		t.Nodes[trans.NodeIdx].translate(currTrans)
 	}
 
-	return t.getAnimation()
+	return t
 }
 
 // factor should be between 0 and 1
 func lerp(a, b, factor float32) float32 {
-	return a*factor + b*(float32(1)-factor)
+	return a*(float32(1)-factor) + b*factor
 }
 
 func vec3Lerp(a, b [3]float32, factor float32) [3]float32 {
