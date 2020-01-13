@@ -4,7 +4,9 @@ uniform mat4 projection;
 uniform mat4 camera;
 uniform mat4 model;
 
-uniform vec4 anim[2];
+uniform vec3 animT[2];
+uniform float animR[2];
+uniform vec3 animS[2];
 
 in vec3 vert;
 in vec2 vertTexCoord;
@@ -28,22 +30,31 @@ void main() {
     float rot = 0.0;
     if (skin1 >= 0 || skin2 >= 0) {
         if (skin1 >= 0 && skin2 >= 0) {
-            aux.x += anim[skin1].x * 0.5 + anim[skin2].x * 0.5;
-            aux.y += anim[skin1].y * 0.5 + anim[skin2].y * 0.5;
-            aux.z += anim[skin1].z * 0.5 + anim[skin2].z * 0.5;
-            rot += anim[skin1][3] * 0.5 + anim[skin2][3] * 0.5;
+            aux.x += animT[skin1].x * 0.5 + animT[skin2].x * 0.5;
+            aux.y += animT[skin1].y * 0.5 + animT[skin2].y * 0.5;
+            aux.z += animT[skin1].z * 0.5 + animT[skin2].z * 0.5;
+            rot += animR[skin1] * 0.5 + animR[skin2] * 0.5;
+            aux.x *= animS[skin1].x * 0.5 + animS[skin2].x * 0.5;
+            aux.y *= animS[skin1].y * 0.5 + animS[skin2].y * 0.5;
+            aux.z *= animS[skin1].z * 0.5 + animS[skin2].z * 0.5;
             
         } else{
             if (skin1 >= 0) {
-                aux.x += anim[skin1].x;
-                aux.y += anim[skin1].y;
-                aux.z += anim[skin1].z;
-                rot += anim[skin1][3];
+                aux.x += animT[skin1].x;
+                aux.y += animT[skin1].y;
+                aux.z += animT[skin1].z;
+                rot += animR[skin1];
+                aux.x *= animS[skin1].x;
+                aux.y *= animS[skin1].y;
+                aux.z *= animS[skin1].z;
             } else {
-                aux.x += anim[skin2].x;
-                aux.y += anim[skin2].y;
-                aux.z += anim[skin2].z;
-                rot += anim[skin2][3];
+                aux.x += animT[skin2].x;
+                aux.y += animT[skin2].y;
+                aux.z += animT[skin2].z;
+                rot += animR[skin2];
+                aux.x *= animS[skin2].x;
+                aux.y *= animS[skin2].y;
+                aux.z *= animS[skin2].z;
             }
         }
     }

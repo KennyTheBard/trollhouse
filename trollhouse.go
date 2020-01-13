@@ -127,7 +127,9 @@ func main() {
 	anim1 := LoadAnimation("./resources/animations/twist.saf")
 	anim2 := LoadAnimation("./resources/animations/bounce.saf")
 
-	animationUniform := gl.GetUniformLocation(program, gl.Str("anim\x00"))
+	animationUniformT := gl.GetUniformLocation(program, gl.Str("animT\x00"))
+	animationUniformR := gl.GetUniformLocation(program, gl.Str("animR\x00"))
+	animationUniformS := gl.GetUniformLocation(program, gl.Str("animS\x00"))
 
 	// Configure global settings
 	gl.Enable(gl.DEPTH_TEST)
@@ -159,11 +161,23 @@ func main() {
 		gl.UniformMatrix4fv(modelUniform, 1, false, &model[0])
 
 		tree.resetTree()
-		tAnim := anim2.animate(anim1.animate(tree, time), time).getAnimation()
-		fmt.Println(tAnim)
-		gl.Uniform4fv(animationUniform,
+		t, r, s := anim2.animate(anim1.animate(tree, time), time).getAnimation()
+
+		fmt.Println("===")
+		fmt.Println(t)
+		fmt.Println(r)
+		fmt.Println(s)
+		fmt.Println()
+
+		gl.Uniform3fv(animationUniformT,
 			2,
-			&(tAnim[0]))
+			&(t[0]))
+		gl.Uniform1fv(animationUniformR,
+			2,
+			&(r[0]))
+		gl.Uniform3fv(animationUniformS,
+			2,
+			&(s[0]))
 
 		gl.BindVertexArray(vao)
 
@@ -381,6 +395,7 @@ type AnimationNode struct {
 	Pos         [3]float32
 	Translation [3]float32
 	RotationY   float32
+	Scale       [3]float32
 	Children    []*AnimationNode
 }
 
@@ -389,6 +404,7 @@ func NewAnimationNode(pos [3]float32) AnimationNode {
 		pos,
 		[3]float32{0.0, 0.0, 0.0},
 		0.0,
+		[3]float32{1.0, 1.0, 1.0},
 		make([]*AnimationNode, 0)}
 }
 
@@ -428,6 +444,23 @@ func (p *AnimationNode) resetRotationY() {
 	}
 }
 
+func (p *AnimationNode) scale(pos [3]float32) {
+	(*p).Scale[0] *= pos[0]
+	(*p).Scale[1] *= pos[1]
+	(*p).Scale[2] *= pos[2]
+
+	for _, child := range (*p).Children {
+		child.scale(pos)
+	}
+}
+
+func (p *AnimationNode) resetScale() {
+	(*p).Scale = [3]float32{1.0, 1.0, 1.0}
+	for _, child := range (*p).Children {
+		child.resetScale()
+	}
+}
+
 type SkinVertex struct {
 	VertexIdx int
 	Weights   map[int]float32
@@ -445,21 +478,28 @@ func (t *AnimationTree) addNodes(node *AnimationNode) {
 	}
 }
 
-func (t AnimationTree) getAnimation() []float32 {
-	ret := make([]float32, len(t.Nodes)*4)
-	for i, node := range t.Nodes {
-		ret[i*4] = node.Translation[0]
-		ret[i*4+1] = node.Translation[1]
-		ret[i*4+2] = node.Translation[2]
-		ret[i*4+3] = node.RotationY
+func (at AnimationTree) getAnimation() ([]float32, []float32, []float32) {
+	t := make([]float32, len(at.Nodes)*3)
+	r := make([]float32, len(at.Nodes)*1)
+	s := make([]float32, len(at.Nodes)*3)
+
+	for i, node := range at.Nodes {
+		t[i*3] = node.Translation[0]
+		t[i*3+1] = node.Translation[1]
+		t[i*3+2] = node.Translation[2]
+		r[i] = node.RotationY
+		s[i*3] = node.Scale[0]
+		s[i*3+1] = node.Scale[1]
+		s[i*3+2] = node.Scale[2]
 	}
-	return ret
+	return t, r, s
 }
 
 func (t *AnimationTree) resetTree() {
 	for _, n := range (*t).Nodes {
 		n.resetTranslation()
 		n.resetRotationY()
+		n.resetScale()
 	}
 }
 
@@ -467,6 +507,7 @@ type NodeAnimationTranslation struct {
 	NodeIdx     int
 	Translation [3]float32
 	RotationY   float32
+	Scale       [3]float32
 }
 
 type AnimationTimeStamp struct {
@@ -525,6 +566,15 @@ func LoadAnimation(filename string) Animation {
 			aux, _ = strconv.ParseFloat(words[4], 32)
 			translation.RotationY = float32(aux)
 
+			aux, _ = strconv.ParseFloat(words[5], 32)
+			translation.Scale[0] = float32(aux)
+
+			aux, _ = strconv.ParseFloat(words[6], 32)
+			translation.Scale[1] = float32(aux)
+
+			aux, _ = strconv.ParseFloat(words[7], 32)
+			translation.Scale[2] = float32(aux)
+
 			timestamp.Translations = append(timestamp.Translations, translation)
 		}
 	}
@@ -570,16 +620,21 @@ func (a Animation) animate(t AnimationTree, currTime float64) AnimationTree {
 	for i, trans := range ts.Translations {
 		currTrans := [3]float32{0.0, 0.0, 0.0}
 		var currRotationY float32
+		currScale := [3]float32{1.0, 1.0, 1.0}
+
 		if pos > 0 {
 			currTrans = vec3Lerp(a.TimeStamps[pos-1].Translations[i].Translation, trans.Translation, factor)
 			currRotationY = lerp(a.TimeStamps[pos-1].Translations[i].RotationY, trans.RotationY, factor)
+			currScale = vec3Lerp(a.TimeStamps[pos-1].Translations[i].Scale, trans.Scale, factor)
 		} else {
 			currTrans = vec3Lerp(currTrans, trans.Translation, factor)
 			currRotationY = lerp(currRotationY, trans.RotationY, factor)
+			currScale = vec3Lerp(currScale, trans.Scale, factor)
 		}
 
 		t.Nodes[trans.NodeIdx].translate(currTrans)
 		t.Nodes[trans.NodeIdx].rotateY(currRotationY)
+		t.Nodes[trans.NodeIdx].scale(currScale)
 	}
 
 	return t
