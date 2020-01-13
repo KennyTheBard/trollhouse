@@ -485,11 +485,10 @@ func (a Animation) animate(t AnimationTree, currTime float64) []float32 {
 
 	var pos int
 	for i, ts := range a.TimeStamps {
+		pos = i
 		if float32(ts.TimePoint)*a.TimeStampDuration > float32(time) {
 			break
 		}
-
-		pos = i
 	}
 
 	ts := a.TimeStamps[pos]
@@ -499,7 +498,8 @@ func (a Animation) animate(t AnimationTree, currTime float64) []float32 {
 		prevTimePoint = float32(a.TimeStamps[pos-1].TimePoint) * a.TimeStampDuration
 	}
 
-	factor := (float32(ts.TimePoint)*a.TimeStampDuration - prevTimePoint) / (float32(time) - prevTimePoint)
+	factor := (float32(time) - prevTimePoint) / (float32(ts.TimePoint)*a.TimeStampDuration - prevTimePoint)
+	fmt.Printf("currTimePoint = %f, prevTimePoint = %f, time = %f, factor = %f\n", float32(ts.TimePoint)*a.TimeStampDuration, prevTimePoint, time, factor)
 
 	for i, trans := range ts.Translations {
 		currTrans := [3]float32{0.0, 0.0, 0.0}
@@ -509,7 +509,7 @@ func (a Animation) animate(t AnimationTree, currTime float64) []float32 {
 			currTrans = vec3Lerp(currTrans, trans.Translation, factor)
 		}
 
-		t.Nodes[trans.NodeIdx].translate(trans.Translation)
+		t.Nodes[trans.NodeIdx].translate(currTrans)
 	}
 
 	return t.getAnimation()
@@ -517,7 +517,7 @@ func (a Animation) animate(t AnimationTree, currTime float64) []float32 {
 
 // factor should be between 0 and 1
 func lerp(a, b, factor float32) float32 {
-	return a*factor + b*(1-factor)
+	return a*factor + b*(float32(1)-factor)
 }
 
 func vec3Lerp(a, b [3]float32, factor float32) [3]float32 {
